@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zählerstände – Lars & Onkel Gregor</title>
+<style>
+  :root {
+    --gruen: #2d6a4f;
+    --gruen-hell: #52b788;
+    --gruen-bg: #d8f3dc;
+    --grau: #f1f3f5;
+    --text: #1b1b1b;
+    --border: #ced4da;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--grau);
+    color: var(--text);
+    padding: 20px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  h1 {
+    color: var(--gruen);
+    margin: 0 0 6px;
+    font-size: 1.8rem;
+  }
+  header p { margin: 0; color: #555; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .user-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-top: 5px solid var(--gruen);
+  }
+  .user-card h2 {
+    margin: 0 0 14px;
+    color: var(--gruen);
+    font-size: 1.3rem;
+  }
+
+  .day-block {
+    background: var(--gruen-bg);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .day-block h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    color: var(--gruen);
+  }
+  .meter-group {
+    margin-bottom: 10px;
+  }
+  .meter-group strong {
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .input-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .input-row label {
+    font-size: 0.8rem;
+    color: #444;
+  }
+  input[type="number"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--gruen-hell);
+  }
+
+  .actions {
+    max-width: 1200px;
+    margin: 20px auto;
+    text-align: center;
+  }
+  button {
+    background: var(--gruen);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin: 0 6px;
+  }
+  button:hover { background: var(--gruen-hell); }
+  button.secondary {
+    background: #6c757d;
+  }
+  button.secondary:hover { background: #868e96; }
+
+  .status {
+    text-align: center;
+    margin-top: 10px;
+    min-height: 1.2em;
+    color: var(--gruen);
+    font-weight: 600;
+  }
+
+  .verbrauch {
+    max-width: 1200px;
+    margin: 24px auto 0;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-top: 5px solid var(--gruen-hell);
+  }
+  .verbrauch h2 {
+    margin: 0 0 14px;
+    color: var(--gruen);
+    font-size: 1.3rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 8px 6px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+  }
+  th:first-child, td:first-child { text-align: left; }
+  th {
+    background: var(--gruen-bg);
+    color: var(--gruen);
+  }
+  .sum-row {
+    font-weight: 700;
+    background: #f8f9fa;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Zählerstände erfassen</h1>
+  <p>Lars & Onkel Gregor · 14.–17.04., jeweils 21:00 Uhr</p>
+</header>
+
+<div class="grid" id="userGrid"></div>
+
+<div class="actions">
+  <button onclick="speichern()">💾 Speichern</button>
+  <button class="secondary" onclick="alleLoeschen()">🗑️ Zurücksetzen</button>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="verbrauch">
+  <h2>📊 Verbrauchsberechnung (Differenzen)</h2>
+  <div id="verbrauchTabelle"></div>
+</div>
+
+<script>
+  const USERS = [
+    { id: 'lars', name: 'Lars' },
+    { id: 'gregor', name: 'Onkel Gregor' }
+  ];
+  const TAGE = [
+    { id: 't1', label: '14.04.2026, 21:00' },
+    { id: 't2', label: '15.04.2026, 21:00' },
+    { id: 't3', label: '16.04.2026, 21:00' },
+    { id: 't4', label: '17.04.2026, 21:00' }
+  ];
+  const METERS = [
+    { id: 'zrz', name: 'Zweirichtungszähler' },
+    { id: 'pv',  name: 'Erzeugungszähler PV' }
+  ];
+  const OBIS = ['1.8.0', '2.8.0'];
+  const STORAGE_KEY = 'zaehlerstaende_lars_gregor_v1';
+
+  // Sicherer Storage mit Fallback (manche Sandboxes blockieren localStorage)
+  let memoryStore = {};
+  let storageBlocked = false;
+  const safeStorage = {
+    get(key) {
+      try { return localStorage.getItem(key); }
+      catch (e) { storageBlocked = true; return memoryStore[key] || null; }
+    },
+    set(key, val) {
+      try { localStorage.setItem(key, val); return true; }
+      catch (e) { storageBlocked = true; memoryStore[key] = val; return 'memory'; }
+    },
+    remove(key) {
+      try { localStorage.removeItem(key); }
+      catch (e) { delete memoryStore[key]; }
+    }
+  };
+
+  // UI aufbauen
+  function buildUI() {
+    const grid = document.getElementById('userGrid');
+    grid.innerHTML = '';
+    USERS.forEach(user => {
+      const card = document.createElement('div');
+      card.className = 'user-card';
+      let html = `<h2>👤 ${user.name}</h2>`;
+      TAGE.forEach(tag => {
+        html += `<div class="day-block"><h3>${tag.label}</h3>`;
+        METERS.forEach(meter => {
+          html += `<div class="meter-group"><strong>${meter.name}</strong>`;
+          OBIS.forEach(obis => {
+            const inputId = `${user.id}_${tag.id}_${meter.id}_${obis.replace(/\./g,'')}`;
+            html += `
+              <div class="input-row">
+                <label>${obis}</label>
+                <input type="number" step="0.001" id="${inputId}" placeholder="kWh" oninput="berechneVerbrauch()">
+              </div>`;
+          });
+          html += `</div>`;
+        });
+        html += `</div>`;
+      });
+      card.innerHTML = html;
+      grid.appendChild(card);
+    });
+  }
+
+  function getVal(id) {
+    const el = document.getElementById(id);
+    const v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
+  }
+
+  function fmt(v) {
+    if (v === null || isNaN(v)) return '–';
+    return v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) + ' kWh';
+  }
+
+  function berechneVerbrauch() {
+    const container = document.getElementById('verbrauchTabelle');
+    let html = '';
+    USERS.forEach(user => {
+      html += `<h3 style="color:#2d6a4f;margin-top:14px;">${user.name}</h3>`;
+      html += `<table><thead><tr>
+        <th>Zeitraum</th>
+        <th>Bezug (ZRZ 1.8.0)</th>
+        <th>Einspeisung (ZRZ 2.8.0)</th>
+        <th>PV-Erzeugung (PV 1.8.0)</th>
+        <th>Eigenverbrauch</th>
+        <th>Gesamtverbrauch</th>
+      </tr></thead><tbody>`;
+
+      for (let i = 0; i < TAGE.length - 1; i++) {
+        const t1 = TAGE[i], t2 = TAGE[i+1];
+        const zrz1_a = getVal(`${user.id}_${t1.id}_zrz_180`);
+        const zrz1_b = getVal(`${user.id}_${t2.id}_zrz_180`);
+        const zrz2_a = getVal(`${user.id}_${t1.id}_zrz_280`);
+        const zrz2_b = getVal(`${user.id}_${t2.id}_zrz_280`);
+        const pv1_a  = getVal(`${user.id}_${t1.id}_pv_180`);
+        const pv1_b  = getVal(`${user.id}_${t2.id}_pv_180`);
+
+        const bezug       = (zrz1_a !== null && zrz1_b !== null) ? zrz1_b - zrz1_a : null;
+        const einspeisung = (zrz2_a !== null && zrz2_b !== null) ? zrz2_b - zrz2_a : null;
+        const pvErz       = (pv1_a  !== null && pv1_b  !== null) ? pv1_b  - pv1_a  : null;
+        const eigenverbr  = (pvErz !== null && einspeisung !== null) ? pvErz - einspeisung : null;
+        const gesamt      = (bezug !== null && eigenverbr !== null) ? bezug + eigenverbr : null;
+
+        html += `<tr>
+          <td>${t1.label.split(',')[0]} → ${t2.label.split(',')[0]}</td>
+          <td>${fmt(bezug)}</td>
+          <td>${fmt(einspeisung)}</td>
+          <td>${fmt(pvErz)}</td>
+          <td>${fmt(eigenverbr)}</td>
+          <td><strong>${fmt(gesamt)}</strong></td>
+        </tr>`;
+      }
+      html += `</tbody></table>`;
+    });
+    container.innerHTML = html;
+  }
+
+  function speichern() {
+    const data = {};
+    USERS.forEach(user => {
+      TAGE.forEach(tag => {
+        METERS.forEach(meter => {
+          OBIS.forEach(obis => {
+            const id = `${user.id}_${tag.id}_${meter.id}_${obis.replace(/\./g,'')}`;
+            data[id] = document.getElementById(id).value;
+          });
+        });
+      });
+    });
+    const result = safeStorage.set(STORAGE_KEY, JSON.stringify(data));
+    if (result === 'memory') {
+      zeigeStatus('✅ Gespeichert (nur im Speicher – Sandbox blockiert localStorage)');
+    } else if (result) {
+      zeigeStatus('✅ Gespeichert!');
+    } else {
+      zeigeStatus('❌ Fehler beim Speichern');
+    }
+  }
+
+  function laden() {
+    const raw = safeStorage.get(STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      Object.keys(data).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = data[id];
+      });
+      berechneVerbrauch();
+    } catch (e) { console.error(e); }
+  }
+
+  function alleLoeschen() {
+    if (!confirm('Wirklich alle Werte löschen?')) return;
+    safeStorage.remove(STORAGE_KEY);
+    memoryStore = {};
+    document.querySelectorAll('input[type="number"]').forEach(i => i.value = '');
+    berechneVerbrauch();
+    zeigeStatus('🗑️ Zurückgesetzt');
+  }
+
+  function zeigeStatus(msg) {
+    const s = document.getElementById('status');
+    s.textContent = msg;
+    setTimeout(() => s.textContent = '', 2500);
+  }
+
+  // Init
+  buildUI();
+  laden();
+  berechneVerbrauch();
+</script>
+
+</body>
+</html>
